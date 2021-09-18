@@ -7,19 +7,19 @@ import (
 )
 
 func TestBulkheadNew(t *testing.T) {
-	domain := "foo.bar"
-	bh := New(domain)
-
-	assert.Equal(t, domain, bh.domain)
-
+	bh := New()
 	maxParallelCalls := 1
 	bh = bh.WithMaxParallelCalls(maxParallelCalls)
 	assert.Zero(t, len(bh.buffer))
 	assert.Zero(t, bh.activeCount)
+
+	assert.True(t, bh.active)
+	bh = bh.DisableBulkhead()
+	assert.False(t, bh.active)
 }
 
 func TestBulkheadIncr(t *testing.T) {
-	bh := New("foo.bar").WithMaxParallelCalls(1)
+	bh := New().WithMaxParallelCalls(1)
 
 	err := bh.Incr()
 	assert.Equal(t, 1, len(bh.buffer))
