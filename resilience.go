@@ -22,10 +22,9 @@ func (r *resilience) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func New(name string) *resilience {
-	resil := &resilience{
+	return &resilience{
 		name: name,
 	}
-	return resil
 }
 
 func (r *resilience) WithBulkHead(bh *bulkhead.Bulkhead) *resilience {
