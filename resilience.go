@@ -28,7 +28,7 @@ func New(name string) *resilience {
 }
 
 func (r *resilience) WithBulkHead(bh *bulkhead.Bulkhead) *resilience {
-	r.bh = bh
+	r.bh = bh.WithName(r.name)
 	return r
 }
 

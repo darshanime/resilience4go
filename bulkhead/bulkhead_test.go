@@ -8,6 +8,11 @@ import (
 
 func TestBulkheadNew(t *testing.T) {
 	bh := New()
+
+	assert.Equal(t, "default", bh.name)
+	bh = bh.WithName("newName")
+	assert.Equal(t, "newName", bh.name)
+
 	maxParallelCalls := 1
 	bh = bh.WithMaxParallelCalls(maxParallelCalls)
 	assert.Zero(t, len(bh.buffer))
