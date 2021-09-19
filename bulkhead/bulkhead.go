@@ -56,6 +56,7 @@ func (b *Bulkhead) Incr() error {
 	start := time.Now()
 	defer func() {
 		metrics.IncrBulkheadWaitSum(b.name, time.Since(start))
+		metrics.SetBulkheadBufferLength(b.name, float64(len(b.buffer)))
 	}()
 
 	select {
@@ -75,4 +76,5 @@ func (b *Bulkhead) Decr() {
 	if len(b.buffer) > 0 {
 		<-b.buffer
 	}
+	metrics.SetBulkheadBufferLength(b.name, float64(len(b.buffer)))
 }

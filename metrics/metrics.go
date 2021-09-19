@@ -16,6 +16,10 @@ var (
 		Name: "bulkhead_incr_wait_sum_ms",
 		Help: "The sum of time spent in bulkhead Incr in ms",
 	}, []string{"bulkhead"})
+	bulkheadBufferLength = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "bulkhead_buffer_length",
+		Help: "The number of requests that are in the bulkhead buffer",
+	}, []string{"bulkhead"})
 )
 
 func IncrBulkheadFull(name string) {
@@ -24,4 +28,8 @@ func IncrBulkheadFull(name string) {
 
 func IncrBulkheadWaitSum(name string, t time.Duration) {
 	bulkheadWaitMSSum.WithLabelValues(name).Add(float64(t.Milliseconds()))
+}
+
+func SetBulkheadBufferLength(name string, value float64) {
+	bulkheadBufferLength.WithLabelValues(name).Set(value)
 }
