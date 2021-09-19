@@ -24,7 +24,6 @@ func (r *resilience) RoundTrip(req *http.Request) (*http.Response, error) {
 	defer r.bh.Decr()
 
 	resp, err := r.next.RoundTrip(req)
-
 	for r.retry.ShouldRetry(req, resp, err) && r.retry.Retry(req) {
 		resp, err = r.next.RoundTrip(req)
 	}
