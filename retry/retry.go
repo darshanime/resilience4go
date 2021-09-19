@@ -37,21 +37,26 @@ func (r *Retry) WithRetryPredicate(retryPredicate func(req *http.Request, resp *
 	return r
 }
 
-func (r *Retry) Retry(req *http.Request) bool {
+func (r *Retry) Wait(req *http.Request) {
+	time.Sleep(r.backoff())
+
 	r.mu.Lock()
-	if r.retryMap[req] < r.maxAttempts {
-		r.retryMap[req]++
-		r.mu.Unlock()
-		time.Sleep(r.backoff())
-		return true
-	}
-	delete(r.retryMap, req)
+	r.retryMap[req]++
 	r.mu.Unlock()
-	return false
 }
 
 func (r *Retry) ShouldRetry(req *http.Request, resp *http.Response, err error) bool {
-	return r.retryPredicate(req, resp, err)
+	if r.retryPredicate(req, resp, err) {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+
+		if r.retryMap[req] < r.maxAttempts {
+			return true
+		}
+		delete(r.retryMap, req)
+		return false
+	}
+	return false
 }
 
 func OnErrors(req *http.Request, resp *http.Response, err error) bool {
