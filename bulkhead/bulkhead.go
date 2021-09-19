@@ -2,7 +2,6 @@ package bulkhead
 
 import (
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/darshanime/resilience4go/metrics"
@@ -16,8 +15,6 @@ const (
 type Bulkhead struct {
 	name            string
 	maxWaitDuration time.Duration
-	activeCount     int
-	mu              sync.Mutex
 	buffer          chan struct{}
 	active          bool
 }
@@ -26,7 +23,6 @@ func New() *Bulkhead {
 	return &Bulkhead{
 		name:            "default",
 		maxWaitDuration: maxWaitDuration,
-		activeCount:     0,
 		buffer:          make(chan struct{}, maxConcurrentCalls),
 		active:          true,
 	}
@@ -67,7 +63,6 @@ func (b *Bulkhead) Incr() error {
 		metrics.IncrBulkheadFull(b.name)
 		return errors.New(BulkHeadFullError)
 	case b.buffer <- struct{}{}:
-		b.activeCount++
 		return nil
 	}
 }
@@ -77,10 +72,7 @@ func (b *Bulkhead) Decr() {
 		return
 	}
 
-	b.mu.Lock()
-	if b.activeCount > 0 {
-		b.activeCount--
+	if len(b.buffer) > 0 {
 		<-b.buffer
 	}
-	b.mu.Unlock()
 }
