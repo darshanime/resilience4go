@@ -2,15 +2,19 @@ package resilience
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/darshanime/resilience4go/bulkhead"
+	"github.com/darshanime/resilience4go/retry"
 )
 
 type resilience struct {
-	name string
-	next http.RoundTripper
+	name    string
+	next    http.RoundTripper
+	timeout time.Duration
 
-	bh *bulkhead.Bulkhead
+	bh    *bulkhead.Bulkhead
+	retry *retry.Retry
 }
 
 func (r *resilience) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -18,7 +22,13 @@ func (r *resilience) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	defer r.bh.Decr()
-	return r.next.RoundTrip(req)
+
+	resp, err := r.next.RoundTrip(req)
+
+	for r.retry.ShouldRetry(req, resp, err) && r.retry.Retry(req) {
+		resp, err = r.next.RoundTrip(req)
+	}
+	return resp, err
 }
 
 func New(name string) *resilience {
@@ -32,9 +42,24 @@ func (r *resilience) WithBulkHead(bh *bulkhead.Bulkhead) *resilience {
 	return r
 }
 
+func (r *resilience) WithRetry(rt *retry.Retry) *resilience {
+	r.retry = rt
+	return r
+}
+
+// WithRequestTimeout will set the httpClient.Timeout to passed value
+func (r *resilience) WithRequestTimeout(timeout *retry.Retry) *resilience {
+	r.timeout = timeout
+	return r
+}
+
 func (r *resilience) BuildWithHTTPClient(hc *http.Client) *http.Client {
 	if hc.Transport == nil {
 		hc.Transport = http.DefaultTransport
+	}
+
+	if r.timeout != 0 {
+		hc.Timeout = r.timeout
 	}
 
 	r.next = hc.Transport
