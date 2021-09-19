@@ -48,7 +48,7 @@ func (r *resilience) WithRetry(rt *retry.Retry) *resilience {
 }
 
 // WithRequestTimeout will set the httpClient.Timeout to passed value
-func (r *resilience) WithRequestTimeout(timeout *retry.Retry) *resilience {
+func (r *resilience) WithRequestTimeout(timeout time.Duration) *resilience {
 	r.timeout = timeout
 	return r
 }
