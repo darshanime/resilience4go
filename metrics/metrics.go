@@ -20,6 +20,10 @@ var (
 		Name: "bulkhead_buffer_length",
 		Help: "The number of requests that are in the bulkhead buffer",
 	}, []string{"bulkhead"})
+	retryCountTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "retry_count_total",
+		Help: "The total retry count of requests",
+	}, []string{"request"})
 )
 
 func IncrBulkheadFull(name string) {
@@ -32,4 +36,8 @@ func IncrBulkheadWaitSum(name string, t time.Duration) {
 
 func SetBulkheadBufferLength(name string, value float64) {
 	bulkheadBufferLength.WithLabelValues(name).Set(value)
+}
+
+func IncrRetryCountTotal(name string) {
+	retryCountTotal.WithLabelValues(name).Inc()
 }

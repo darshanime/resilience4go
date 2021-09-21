@@ -64,6 +64,7 @@ func (r *Retry) ShouldRetry(req *http.Request, resp *http.Response, err error) b
 		defer r.mu.Unlock()
 
 		if r.retryMap[req] < r.maxAttempts {
+			metrics.IncrRetryCountTotal(r.reqNamer(req))
 			return true
 		}
 		delete(r.retryMap, req)
