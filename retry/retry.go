@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/darshanime/resilience4go/metrics"
 )
 
 type Retry struct {
@@ -11,11 +13,16 @@ type Retry struct {
 	retryMap       map[*http.Request]int
 	backoff        func() time.Duration
 	retryPredicate func(req *http.Request, resp *http.Response, err error) bool
+	reqNamer       func(req *http.Request) string
 	mu             sync.Mutex
 }
 
 func defaultRetryBackoff() time.Duration {
 	return time.Duration(0)
+}
+
+func defaultRequestNamer(req *http.Request) string {
+	return req.URL.String()
 }
 
 func New(maxAttempts int) *Retry {
@@ -24,6 +31,7 @@ func New(maxAttempts int) *Retry {
 		retryMap:       make(map[*http.Request]int),
 		backoff:        defaultRetryBackoff,
 		retryPredicate: OnServerErrors,
+		reqNamer:       defaultRequestNamer,
 	}
 }
 
@@ -34,6 +42,11 @@ func (r *Retry) WithBackoffFunction(f func() time.Duration) *Retry {
 
 func (r *Retry) WithRetryPredicate(retryPredicate func(req *http.Request, resp *http.Response, err error) bool) *Retry {
 	r.retryPredicate = retryPredicate
+	return r
+}
+
+func (r *Retry) WithRequestNamer(reqNamer func(req *http.Request) string) *Retry {
+	r.reqNamer = reqNamer
 	return r
 }
 

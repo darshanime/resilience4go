@@ -2,6 +2,7 @@ package retry
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -24,6 +25,12 @@ func TestRetryNew(t *testing.T) {
 	r = r.WithRetryPredicate(rp)
 	assert.NotNil(t, r.backoff)
 
+	u, _ := url.Parse("http://foo.bar")
+	req := &http.Request{URL: u}
+	assert.Equal(t, "http://foo.bar", r.reqNamer(req))
+
+	r.WithRequestNamer(func(req *http.Request) string { return "foobar" })
+	assert.Equal(t, "foobar", r.reqNamer(req))
 }
 
 func TestConstantBackoff(t *testing.T) {
