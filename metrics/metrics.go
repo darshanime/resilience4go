@@ -20,6 +20,10 @@ var (
 		Name: "bulkhead_buffer_length",
 		Help: "The number of requests that are in the bulkhead buffer",
 	}, []string{"bulkhead"})
+	bulkheadMaxBufferLength = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "bulkhead_max_buffer_length",
+		Help: "The max number of requests that can be in the bulkhead buffer",
+	}, []string{"bulkhead"})
 	retryCountTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "retry_count_total",
 		Help: "The total retry count of requests",
@@ -35,6 +39,10 @@ func IncrBulkheadWaitSum(name string, t time.Duration) {
 }
 
 func SetBulkheadBufferLength(name string, value float64) {
+	bulkheadBufferLength.WithLabelValues(name).Set(value)
+}
+
+func SetBulkheadMaxBufferLength(name string, value float64) {
 	bulkheadBufferLength.WithLabelValues(name).Set(value)
 }
 
