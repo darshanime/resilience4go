@@ -23,20 +23,17 @@ func (l *loggerTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func main() {
-	bh := bulkhead.New().WithMaxParallelCalls(2)
+	bh := bulkhead.New().WithMaxParallelCalls(2).WithMaxWaitDuration(1 * time.Second)
 
 	rt := retry.New(3).WithBackoffFunction(
 		retry.ConstantBackoff(2 * time.Second),
 	)
 
-	myClient := http.DefaultClient
-	myClient.Transport = &loggerTripper{
-		next: http.DefaultTransport,
-	}
-
-	newClient := resilience.New("user_service").WithBulkHead(bh).WithRetry(rt).WithRequestTimeout(
+	clientPlus := resilience.New("user_service").WithBulkHead(bh).WithRetry(rt).WithRequestTimeout(
 		100 * time.Millisecond,
-	).BuildWithHTTPClient(myClient)
+	).Build()
+
+	clientPlus.Get("http://google.com")
 
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
@@ -44,7 +41,7 @@ func main() {
 		wg.Add(1)
 		go func() {
 			url := "https://httpbin.org/status/" + fmt.Sprintf("%d", 500+i)
-			newClient.Get(url)
+			clientPlus.Get(url)
 			wg.Done()
 		}()
 	}
