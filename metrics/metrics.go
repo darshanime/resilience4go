@@ -1,51 +1,98 @@
 package metrics
 
 import (
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	model "github.com/prometheus/client_model/go"
 )
 
+type Metrics struct {
+	registry      prometheus.Registerer
+	buckets       []float64
+	mu            sync.Mutex
+	collectorChan chan prometheus.Metric
+}
+
 var (
-	bulkheadFullCount = promauto.NewCounterVec(prometheus.CounterOpts{
+	BulkheadFullCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "bulkhead_full_exception_count",
 		Help: "The total number of bulkhead full exception events",
 	}, []string{"bulkhead"})
-	bulkheadWaitMSSum = promauto.NewCounterVec(prometheus.CounterOpts{
+	BulkheadWaitMSSum = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "bulkhead_incr_wait_sum_ms",
 		Help: "The sum of time spent in bulkhead Incr in ms",
 	}, []string{"bulkhead"})
-	bulkheadBufferLength = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	BulkheadBufferLength = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "bulkhead_buffer_length",
 		Help: "The number of requests that are in the bulkhead buffer",
 	}, []string{"bulkhead"})
-	bulkheadMaxBufferLength = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	BulkheadMaxBufferLength = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "bulkhead_max_buffer_length",
 		Help: "The max number of requests that can be in the bulkhead buffer",
 	}, []string{"bulkhead"})
-	retryCountTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	RetryCountTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "retry_count_total",
 		Help: "The total retry count of requests",
 	}, []string{"request"})
 )
 
 func IncrBulkheadFull(name string) {
-	bulkheadFullCount.WithLabelValues(name).Inc()
+	BulkheadFullCount.WithLabelValues(name).Inc()
 }
 
 func IncrBulkheadWaitSum(name string, t time.Duration) {
-	bulkheadWaitMSSum.WithLabelValues(name).Add(float64(t.Milliseconds()))
+	BulkheadWaitMSSum.WithLabelValues(name).Add(float64(t.Milliseconds()))
 }
 
 func SetBulkheadBufferLength(name string, value float64) {
-	bulkheadBufferLength.WithLabelValues(name).Set(value)
+	BulkheadBufferLength.WithLabelValues(name).Set(value)
 }
 
 func SetBulkheadMaxBufferLength(name string, value float64) {
-	bulkheadBufferLength.WithLabelValues(name).Set(value)
+	BulkheadMaxBufferLength.WithLabelValues(name).Set(value)
 }
 
 func IncrRetryCountTotal(name string) {
-	retryCountTotal.WithLabelValues(name).Inc()
+	RetryCountTotal.WithLabelValues(name).Inc()
+}
+
+func New() *Metrics {
+	return &Metrics{
+		registry:      prometheus.DefaultRegisterer,
+		buckets:       prometheus.DefBuckets,
+		collectorChan: make(chan prometheus.Metric, 1),
+	}
+}
+
+func (m *Metrics) WithRegisterer(r prometheus.Registerer) *Metrics {
+	m.registry = r
+	return m
+}
+
+func (m *Metrics) WithBuckets(b []float64) *Metrics {
+	m.buckets = b
+	return m
+}
+
+func (m *Metrics) Build() {
+	m.registry.MustRegister(
+		BulkheadFullCount,
+		BulkheadWaitMSSum,
+		BulkheadBufferLength,
+		BulkheadMaxBufferLength,
+		RetryCountTotal)
+}
+
+func (m *Metrics) GetMetricValue(col prometheus.Collector) (float64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	col.Collect(m.collectorChan)
+	metric := model.Metric{}
+	if err := (<-m.collectorChan).Write(&metric); err != nil {
+		return 0.0, err
+	}
+	return *metric.Counter.Value, nil
 }

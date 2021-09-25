@@ -1,6 +1,8 @@
 package bulkhead
 
-const (
-	// BulkHeadFullError is returned if bulkhead full even after max wait duration
-	BulkHeadFullError = "bulkhead full error"
+import "errors"
+
+var (
+	// ErrFull is returned if bulkhead full even after max wait duration
+	ErrFull = errors.New("bulkhead full error")
 )
