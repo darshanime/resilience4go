@@ -1,7 +1,7 @@
 package bulkhead
 
 import (
-	"errors"
+	"sync"
 	"time"
 
 	"github.com/darshanime/resilience4go/metrics"
@@ -10,6 +10,7 @@ import (
 const (
 	maxConcurrentCalls = 10
 	maxWaitDuration    = 500 * time.Microsecond
+	defaultName        = "default"
 )
 
 type Bulkhead struct {
@@ -17,11 +18,12 @@ type Bulkhead struct {
 	maxWaitDuration time.Duration
 	buffer          chan struct{}
 	active          bool
+	mu              sync.Mutex
 }
 
 func New() *Bulkhead {
 	return &Bulkhead{
-		name:            "default",
+		name:            defaultName,
 		maxWaitDuration: maxWaitDuration,
 		buffer:          make(chan struct{}, maxConcurrentCalls),
 		active:          true,
@@ -48,6 +50,30 @@ func (b *Bulkhead) DisableBulkhead() *Bulkhead {
 	return b
 }
 
+func (b *Bulkhead) ResizeBulkhead(newLen int) *Bulkhead {
+	if newLen == 0 || newLen == len(b.buffer) {
+		return b
+	}
+
+	metrics.SetBulkheadMaxBufferLength(b.name, float64(newLen))
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	activeLen := len(b.buffer)
+	newChan := make(chan struct{}, newLen)
+	b.buffer = newChan
+
+	if newLen <= activeLen {
+		return b
+	}
+	for i := 0; i < activeLen; i++ {
+		b.buffer <- struct{}{}
+	}
+
+	return b
+}
+
 func (b *Bulkhead) Incr() error {
 	if b == nil || !b.active {
 		return nil
@@ -62,7 +88,7 @@ func (b *Bulkhead) Incr() error {
 	select {
 	case <-time.After(b.maxWaitDuration):
 		metrics.IncrBulkheadFull(b.name)
-		return errors.New(BulkHeadFullError)
+		return ErrFull
 	case b.buffer <- struct{}{}:
 		return nil
 	}
@@ -73,8 +99,11 @@ func (b *Bulkhead) Decr() {
 		return
 	}
 
+	b.mu.Lock()
 	if len(b.buffer) > 0 {
 		<-b.buffer
 	}
+	b.mu.Unlock()
+
 	metrics.SetBulkheadBufferLength(b.name, float64(len(b.buffer)))
 }
