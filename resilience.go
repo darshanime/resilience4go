@@ -17,6 +17,12 @@ type Resilience struct {
 	retry *retry.Retry
 }
 
+func closeResp(resp *http.Response) {
+	if resp != nil {
+		resp.Body.Close()
+	}
+}
+
 func (r *Resilience) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err := r.bh.Incr(); err != nil {
 		return nil, err
@@ -24,10 +30,12 @@ func (r *Resilience) RoundTrip(req *http.Request) (*http.Response, error) {
 	defer r.bh.Decr()
 
 	resp, err := r.next.RoundTrip(req)
+	closeResp(resp)
 
 	for r.retry.ShouldRetry(req, resp, err) {
 		r.retry.Wait(req)
 		resp, err = r.next.RoundTrip(req)
+		closeResp(resp)
 	}
 	return resp, err
 }
@@ -54,6 +62,7 @@ func (r *Resilience) WithRequestTimeout(timeout time.Duration) *Resilience {
 	return r
 }
 
+// BuildWithHTTPClient will accept a http client from user
 func (r *Resilience) BuildWithHTTPClient(hc *http.Client) *http.Client {
 	if hc.Transport == nil {
 		hc.Transport = http.DefaultTransport
