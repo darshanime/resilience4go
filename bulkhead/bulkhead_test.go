@@ -25,11 +25,18 @@ func TestBulkheadNew(t *testing.T) {
 
 func TestBulkheadIncr(t *testing.T) {
 	bh := New().WithMaxParallelCalls(1)
-	m := metrics.New()
 
-	counter, err := metrics.BulkheadFullCount.GetMetricWithLabelValues(defaultName)
+	maxBufferLength, err := metrics.BulkheadMaxBufferLength.GetMetricWithLabelValues(bh.name)
 	assert.Nil(t, err)
-	value, err := m.GetMetricValue(counter)
+
+	m := metrics.New()
+	value, err := m.GetGaugeValue(maxBufferLength)
+	assert.Nil(t, err)
+	assert.Equal(t, 1.0, value)
+
+	counter, err := metrics.BulkheadFullCount.GetMetricWithLabelValues(bh.name)
+	assert.Nil(t, err)
+	value, err = m.GetCounterValue(counter)
 	assert.Nil(t, err)
 	assert.Zero(t, value)
 
@@ -39,7 +46,7 @@ func TestBulkheadIncr(t *testing.T) {
 
 	err = bh.Incr()
 	assert.Equal(t, err, ErrFull)
-	value, err = m.GetMetricValue(counter)
+	value, err = m.GetCounterValue(counter)
 	assert.Nil(t, err)
 	assert.Equal(t, 1.0, value)
 }

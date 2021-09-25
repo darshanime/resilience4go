@@ -32,6 +32,8 @@ func New() *Bulkhead {
 
 func (b *Bulkhead) WithMaxParallelCalls(calls int) *Bulkhead {
 	b.buffer = make(chan struct{}, calls)
+	// TODO: if WithName is called after WithMaxParallelCalls, it may add a spurious metric with bulkhead=default
+	metrics.SetBulkheadMaxBufferLength(b.name, float64(calls))
 	return b
 }
 

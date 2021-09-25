@@ -85,7 +85,7 @@ func (m *Metrics) Build() {
 		RetryCountTotal)
 }
 
-func (m *Metrics) GetMetricValue(col prometheus.Collector) (float64, error) {
+func (m *Metrics) GetCounterValue(col prometheus.Collector) (float64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -95,4 +95,16 @@ func (m *Metrics) GetMetricValue(col prometheus.Collector) (float64, error) {
 		return 0.0, err
 	}
 	return *metric.Counter.Value, nil
+}
+
+func (m *Metrics) GetGaugeValue(col prometheus.Collector) (float64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	col.Collect(m.collectorChan)
+	metric := model.Metric{}
+	if err := (<-m.collectorChan).Write(&metric); err != nil {
+		return 0.0, err
+	}
+	return *metric.Gauge.Value, nil
 }
