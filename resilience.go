@@ -1,20 +1,28 @@
 package resilience
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/darshanime/resilience4go/bulkhead"
+	"github.com/darshanime/resilience4go/metrics"
 	"github.com/darshanime/resilience4go/retry"
 )
 
 type Resilience struct {
-	name    string
-	next    http.RoundTripper
-	timeout time.Duration
+	name     string
+	reqNamer func(req *http.Request) string
+	next     http.RoundTripper
+	timeout  time.Duration
 
 	bh    *bulkhead.Bulkhead
 	retry *retry.Retry
+	m     *metrics.Metrics
+}
+
+func defaultRequestNamer(req *http.Request) string {
+	return req.URL.String()
 }
 
 func closeResp(resp *http.Response) {
@@ -29,10 +37,14 @@ func (r *Resilience) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	defer r.bh.Decr()
 
+	reqName := r.reqNamer(req)
 	resp, err := r.next.RoundTrip(req)
+	if r.m != nil {
+		metrics.IncrHTTPResponseCode(reqName, fmt.Sprintf("%d", resp.StatusCode))
+	}
 	closeResp(resp)
 
-	for r.retry.ShouldRetry(req, resp, err) {
+	for r.retry.ShouldRetry(req, resp, reqName, err) {
 		r.retry.Wait(req)
 		resp, err = r.next.RoundTrip(req)
 		closeResp(resp)
@@ -40,9 +52,15 @@ func (r *Resilience) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
+func (r *Resilience) WithRequestNamer(reqNamer func(req *http.Request) string) *Resilience {
+	r.reqNamer = reqNamer
+	return r
+}
+
 func New(name string) *Resilience {
 	return &Resilience{
-		name: name,
+		name:     name,
+		reqNamer: defaultRequestNamer,
 	}
 }
 

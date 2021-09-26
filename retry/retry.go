@@ -13,16 +13,11 @@ type Retry struct {
 	retryMap       map[*http.Request]int
 	backoff        func() time.Duration
 	retryPredicate func(req *http.Request, resp *http.Response, err error) bool
-	reqNamer       func(req *http.Request) string
 	mu             sync.Mutex
 }
 
 func defaultRetryBackoff() time.Duration {
 	return time.Duration(0)
-}
-
-func defaultRequestNamer(req *http.Request) string {
-	return req.URL.String()
 }
 
 func New(maxAttempts int) *Retry {
@@ -31,7 +26,6 @@ func New(maxAttempts int) *Retry {
 		retryMap:       make(map[*http.Request]int),
 		backoff:        defaultRetryBackoff,
 		retryPredicate: OnServerErrors,
-		reqNamer:       defaultRequestNamer,
 	}
 }
 
@@ -45,11 +39,6 @@ func (r *Retry) WithRetryPredicate(retryPredicate func(req *http.Request, resp *
 	return r
 }
 
-func (r *Retry) WithRequestNamer(reqNamer func(req *http.Request) string) *Retry {
-	r.reqNamer = reqNamer
-	return r
-}
-
 func (r *Retry) Wait(req *http.Request) {
 	time.Sleep(r.backoff())
 
@@ -58,13 +47,13 @@ func (r *Retry) Wait(req *http.Request) {
 	r.mu.Unlock()
 }
 
-func (r *Retry) ShouldRetry(req *http.Request, resp *http.Response, err error) bool {
+func (r *Retry) ShouldRetry(req *http.Request, resp *http.Response, name string, err error) bool {
 	if r.retryPredicate(req, resp, err) {
 		r.mu.Lock()
 		defer r.mu.Unlock()
 
 		if r.retryMap[req] < r.maxAttempts {
-			metrics.IncrRetryCountTotal(r.reqNamer(req))
+			metrics.IncrRetryCountTotal(name)
 			return true
 		}
 		delete(r.retryMap, req)

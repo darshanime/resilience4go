@@ -36,7 +36,27 @@ var (
 		Name: "retry_count_total",
 		Help: "The total retry count of requests",
 	}, []string{"request"})
+	HTTPResponseCode = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "http_response_codes_total",
+		Help: "The total count of response codes for requests",
+	}, []string{"request", "code"})
+	HTTPResponseSize = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "http_response_size_total",
+		Help: "The total size of response for requests",
+	}, []string{"request", "code"})
 )
+
+func IncrHTTPResponseCode(name, code string) {
+	HTTPResponseCode.WithLabelValues(name, code).Inc()
+}
+
+func IncrHTTPResponseSize(name, code string, value float64) {
+	HTTPResponseSize.WithLabelValues(name, code).Add(value)
+}
+
+func ObserveHTTPResponseLatency(name, code string, value float64) {
+	HTTPResponseSize.WithLabelValues(name, code).Add(value)
+}
 
 func IncrBulkheadFull(name string) {
 	BulkheadFullCount.WithLabelValues(name).Inc()

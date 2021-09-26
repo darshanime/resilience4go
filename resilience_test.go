@@ -2,6 +2,7 @@ package resilience
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/darshanime/resilience4go/bulkhead"
@@ -35,4 +36,11 @@ func TestResilience(t *testing.T) {
 	newHTTPClient := r.BuildWithHTTPClient(myHTTPClient)
 	assert.Equal(t, myTransport, r.next)
 	assert.Equal(t, r, newHTTPClient.Transport)
+
+	u, _ := url.Parse("http://foo.bar")
+	req := &http.Request{URL: u}
+	assert.Equal(t, "http://foo.bar", r.reqNamer(req))
+
+	r.WithRequestNamer(func(req *http.Request) string { return "foobar" })
+	assert.Equal(t, "foobar", r.reqNamer(req))
 }
