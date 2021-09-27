@@ -39,7 +39,7 @@ func (r *Resilience) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	reqName := r.reqNamer(req)
 	resp, err := r.next.RoundTrip(req)
-	if r.m != nil {
+	if r.m != nil && resp != nil {
 		metrics.IncrHTTPResponseCode(reqName, fmt.Sprintf("%d", resp.StatusCode))
 	}
 	closeResp(resp)
