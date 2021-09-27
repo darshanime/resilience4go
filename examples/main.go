@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	resilience "github.com/darshanime/resilience4go"
@@ -11,12 +10,9 @@ import (
 	"github.com/darshanime/resilience4go/retry"
 )
 
-type loggerTripper struct {
-	next http.RoundTripper
-}
-
 func main() {
-	bh := bulkhead.New().WithMaxParallelCalls(2).WithMaxWaitDuration(1 * time.Second)
+	bulkheadSize := 5
+	bh := bulkhead.New().WithName("user_service").WithMaxParallelCalls(bulkheadSize).WithMaxWaitDuration(1 * time.Second)
 
 	rt := retry.New(3).WithBackoffFunction(
 		retry.ConstantBackoff(2 * time.Second),
@@ -29,7 +25,7 @@ func main() {
 	).WithMetrics(m).Build()
 
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(50 * time.Second)
 		oldValue := float64(0)
 
 		for {
@@ -38,7 +34,8 @@ func main() {
 			value, _ := bh.GetBulkheadFullCount()
 			if value > oldValue {
 				oldValue = value
-				bh.ResizeBulkhead(int(value))
+				bulkheadSize *= 2
+				bh.ResizeBulkhead(bulkheadSize)
 			}
 		}
 	}()
