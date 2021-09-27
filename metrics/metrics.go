@@ -96,13 +96,14 @@ func (m *Metrics) WithBuckets(b []float64) *Metrics {
 	return m
 }
 
-func (m *Metrics) Build() {
+func (m *Metrics) Build() *Metrics {
 	m.registry.MustRegister(
 		BulkheadFullCount,
 		BulkheadWaitMSSum,
 		BulkheadBufferLength,
 		BulkheadMaxBufferLength,
 		RetryCountTotal)
+	return m
 }
 
 func (m *Metrics) GetCounterValue(col prometheus.Collector) (float64, error) {

@@ -80,6 +80,11 @@ func (r *Resilience) WithRequestTimeout(timeout time.Duration) *Resilience {
 	return r
 }
 
+func (r *Resilience) WithMetrics(m *metrics.Metrics) *Resilience {
+	r.m = m
+	return r
+}
+
 // BuildWithHTTPClient will accept a http client from user
 func (r *Resilience) BuildWithHTTPClient(hc *http.Client) *http.Client {
 	if hc.Transport == nil {
@@ -92,6 +97,9 @@ func (r *Resilience) BuildWithHTTPClient(hc *http.Client) *http.Client {
 
 	r.next = hc.Transport
 	hc.Transport = r
+
+	// passing metrics
+	r.bh = r.bh.WithMetrics(r.m)
 	return hc
 }
 

@@ -16,9 +16,11 @@ const (
 type Bulkhead struct {
 	name            string
 	maxWaitDuration time.Duration
-	buffer          chan struct{}
 	active          bool
-	mu              sync.Mutex
+	m               *metrics.Metrics
+
+	buffer chan struct{}
+	mu     sync.Mutex
 }
 
 func New() *Bulkhead {
@@ -39,6 +41,11 @@ func (b *Bulkhead) WithMaxParallelCalls(calls int) *Bulkhead {
 
 func (b *Bulkhead) WithName(name string) *Bulkhead {
 	b.name = name
+	return b
+}
+
+func (b *Bulkhead) WithMetrics(m *metrics.Metrics) *Bulkhead {
+	b.m = m
 	return b
 }
 
@@ -108,4 +115,13 @@ func (b *Bulkhead) Decr() {
 	b.mu.Unlock()
 
 	metrics.SetBulkheadBufferLength(b.name, float64(len(b.buffer)))
+}
+
+func (b *Bulkhead) GetBulkheadFullCount() (float64, error) {
+	counter, err := metrics.BulkheadFullCount.GetMetricWithLabelValues(b.name)
+	if err != nil {
+		return 0.0, err
+	}
+
+	return b.m.GetCounterValue(counter)
 }

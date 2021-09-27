@@ -3,23 +3,16 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	resilience "github.com/darshanime/resilience4go"
 	"github.com/darshanime/resilience4go/bulkhead"
+	"github.com/darshanime/resilience4go/metrics"
 	"github.com/darshanime/resilience4go/retry"
 )
 
 type loggerTripper struct {
 	next http.RoundTripper
-}
-
-func (l *loggerTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	fmt.Printf("%s: calling\n", req.URL)
-	resp, err := l.next.RoundTrip(req)
-	fmt.Printf("%s: resp %+v, error %s\n", req.URL, resp, err)
-	return resp, err
 }
 
 func main() {
@@ -29,21 +22,29 @@ func main() {
 		retry.ConstantBackoff(2 * time.Second),
 	)
 
+	m := metrics.New().Build()
+
 	clientPlus := resilience.New("user_service").WithBulkHead(bh).WithRetry(rt).WithRequestTimeout(
 		100 * time.Millisecond,
-	).Build()
+	).WithMetrics(m).Build()
 
-	clientPlus.Get("http://google.com")
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		oldValue := float64(0)
 
-	var wg sync.WaitGroup
+		for {
+			<-ticker.C
+
+			value, _ := bh.GetBulkheadFullCount()
+			if value > oldValue {
+				oldValue = value
+				bh.ResizeBulkhead(int(value))
+			}
+		}
+	}()
+
 	for i := 0; i < 5; i++ {
-		i := i
-		wg.Add(1)
-		go func() {
-			url := "https://httpbin.org/status/" + fmt.Sprintf("%d", 500+i)
-			clientPlus.Get(url)
-			wg.Done()
-		}()
+		url := "https://httpbin.org/status/" + fmt.Sprintf("%d", 500+i)
+		clientPlus.Get(url)
 	}
-	wg.Wait()
 }
