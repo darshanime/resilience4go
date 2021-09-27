@@ -102,7 +102,8 @@ func (m *Metrics) Build() *Metrics {
 		BulkheadWaitMSSum,
 		BulkheadBufferLength,
 		BulkheadMaxBufferLength,
-		RetryCountTotal)
+		RetryCountTotal,
+		HTTPResponseCode)
 	return m
 }
 
